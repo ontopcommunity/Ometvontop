@@ -3,9 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat Ẩn Danh - Gặp Gỡ Người Lạ</title>
+    <title>Chat Ẩn Danh - No Database</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- 1. Thư viện PeerJS (Kết nối P2P Video/Chat) -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- 2. Thư viện MQTT (Dùng làm "Loa phường" tìm người lạ thay cho Database) -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
     <style>
         :root {
             --bg-color: #f0f2f5;
@@ -42,7 +47,6 @@
 
         main { display: flex; flex: 1; overflow: hidden; padding: 20px; gap: 20px; max-width: 1400px; margin: 0 auto; width: 100%; }
 
-        /* Video Section */
         .video-section { flex: 2; display: flex; flex-direction: column; gap: 15px; background: var(--panel-bg); padding: 15px; border-radius: 12px; border: 1px solid var(--border-color); position: relative; }
         .video-container { flex: 1; position: relative; background: #000; border-radius: 8px; overflow: hidden; display: flex; justify-content: center; align-items: center;}
         #strangerVideo { width: 100%; height: 100%; object-fit: cover; }
@@ -55,12 +59,10 @@
         .btn-next { background-color: #ff4757; }
         .btn-stop { background-color: #747d8c; }
 
-        /* Chat Section */
         .chat-section { flex: 1; display: flex; flex-direction: column; background: var(--panel-bg); border-radius: 12px; border: 1px solid var(--border-color); overflow: hidden; min-width: 300px;}
         .chat-header { padding: 15px; border-bottom: 1px solid var(--border-color); font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
         
-        /* Small buttons for Chat Header */
-        .btn-small { padding: 6px 12px; border: none; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; color: #fff; transition: opacity 0.2s; }
+        .btn-small { padding: 6px 12px; border: none; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; color: #fff; }
         .btn-small:hover { opacity: 0.9; }
         .btn-small.btn-next { background-color: #ff4757; }
         .btn-small.btn-stop { background-color: #747d8c; }
@@ -75,7 +77,6 @@
         .chat-input input { flex: 1; padding: 12px 15px; border-radius: 20px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); outline: none; }
         .chat-input button { background: var(--primary-color); color: white; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; display: flex; justify-content: center; align-items: center; }
 
-        /* Status Overlay */
         #statusOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; color: white; font-size: 20px; z-index: 5; flex-direction: column; gap: 10px; text-align: center; padding: 20px;}
         
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; }
@@ -94,14 +95,14 @@
     <div class="modal-overlay" id="nicknameModal">
         <div class="modal">
             <h2>Chào mừng bạn!</h2>
-            <p style="margin-top: 10px; color: gray;">Vui lòng nhập biệt danh để tham gia trò chuyện</p>
+            <p style="margin-top: 10px; color: gray;">Vui lòng nhập biệt danh để tham gia</p>
             <input type="text" id="nicknameInput" placeholder="VD: Mèo Lười...">
             <button class="btn btn-start" style="width: 100%;" onclick="startApp()">Vào Phòng</button>
         </div>
     </div>
 
     <header>
-        <div class="logo"><i class="fas fa-video"></i> RandomChat</div>
+        <div class="logo"><i class="fas fa-video"></i> NoDB Chat</div>
         <div class="controls">
             <span id="currentUserInfo" style="font-weight: 500;"></span>
             <button onclick="toggleTheme()"><i class="fas fa-moon" id="themeIcon"></i></button>
@@ -112,21 +113,21 @@
         <div class="video-section">
             <div class="video-container">
                 <div id="statusOverlay">
-                    <i class="fas fa-spinner fa-spin" style="font-size: 30px;"></i>
+                    <i class="fas fa-spinner fa-spin" style="font-size: 30px;" id="loadingIcon"></i>
                     <span id="statusText">Nhấn Bắt Đầu để tìm người lạ</span>
                 </div>
                 <video id="strangerVideo" autoplay playsinline></video>
                 <video id="myVideo" autoplay muted playsinline></video>
             </div>
             <div class="action-buttons">
-                <button class="btn btn-start" id="startBtn" onclick="findStranger()"><i class="fas fa-play"></i> Bắt đầu</button>
+                <button class="btn btn-start" onclick="findStranger()"><i class="fas fa-play"></i> Bắt đầu</button>
                 <button class="btn btn-stop" onclick="stopConnection()"><i class="fas fa-stop"></i> Dừng</button>
                 <button class="btn btn-next" onclick="nextStranger()"><i class="fas fa-forward"></i> Next</button>
             </div>
         </div>
 
         <div class="chat-section">
-            <div class="chat-header" id="chatHeader">
+            <div class="chat-header">
                 <span><i class="fas fa-comments"></i> Trò chuyện</span>
                 <div style="display: flex; gap: 5px;">
                     <button class="btn-small btn-stop" onclick="stopConnection()"><i class="fas fa-stop"></i></button>
@@ -134,7 +135,7 @@
                 </div>
             </div>
             <div class="chat-messages" id="chatBox">
-                <div class="system-msg">Chào mừng bạn đến với hệ thống chat ngẫu nhiên!</div>
+                <div class="system-msg">Hệ thống hoàn toàn không lưu trữ dữ liệu của bạn!</div>
             </div>
             <div class="chat-input">
                 <input type="text" id="msgInput" placeholder="Nhập tin nhắn..." onkeypress="handleEnter(event)" disabled>
@@ -147,9 +148,15 @@
         let myName = "";
         let localStream = null;
         let isDark = false;
+        
         let peer = null; 
         let currentCall = null;
         let currentConnection = null;
+        
+        // MQTT (Lobby tìm kiếm công cộng)
+        let mqttClient = null;
+        const LOBBY_TOPIC = "random-chat-vietnam-room-8888"; 
+        let isLookingForPartner = false;
 
         window.onload = () => {
             const savedName = localStorage.getItem('nickname');
@@ -177,69 +184,99 @@
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 document.getElementById('myVideo').srcObject = localStream;
                 initPeer();
+                initMqttLobby(); // Bật loa phường
             } catch (err) {
                 alert("Cần cho phép Camera/Mic để tiếp tục!");
             }
         }
 
+        // Khởi tạo PeerJS (Cấp ID mạng)
         function initPeer() {
-            document.getElementById('statusText').innerText = "Đang kết nối tới máy chủ...";
+            document.getElementById('statusText').innerText = "Đang kết nối vào mạng lưới...";
             peer = new Peer(); 
             peer.on('open', (id) => {
-                document.getElementById('statusText').innerText = "Đã sẵn sàng! Nhấn 'Bắt đầu' để tìm người";
-                document.getElementById('statusOverlay').style.display = 'flex';
-                document.querySelector('.fa-spinner').style.display = 'none';
+                document.getElementById('statusText').innerText = "Sẵn sàng! Nhấn 'Bắt đầu' để tìm người lạ.";
+                document.getElementById('loadingIcon').style.display = 'none';
             });
             peer.on('call', (call) => {
+                // Có người gọi đến, mình nghe máy
+                isLookingForPartner = false; 
                 call.answer(localStream);
                 setupCallEvent(call);
             });
             peer.on('connection', (conn) => setupChatEvent(conn));
         }
 
-        // DỪNG KẾT NỐI HIỆN TẠI (Cả Video lẫn Chat)
-        function stopConnection() {
-            let wasConnected = false;
+        // Khởi tạo kênh tìm kiếm trung gian (MQTT Public Broker)
+        function initMqttLobby() {
+            // Dùng một broker WSS miễn phí và công cộng
+            mqttClient = mqtt.connect('wss://broker.hivemq.com:8443/mqtt');
             
+            mqttClient.on('connect', () => {
+                mqttClient.subscribe(LOBBY_TOPIC);
+                console.log("Đã vào sảnh chờ chung!");
+            });
+
+            mqttClient.on('message', (topic, message) => {
+                if (!isLookingForPartner || !peer) return; // Nếu đang không tìm người thì mặc kệ
+                
+                try {
+                    let data = JSON.parse(message.toString());
+                    // Nếu thấy có ai đó đang tìm, và ID đó không phải của mình
+                    if (data.action === 'LOOKING' && data.peerId !== peer.id) {
+                        isLookingForPartner = false; // Ngừng tìm
+                        connectToStranger(data.peerId); // Chủ động gọi người đó
+                    }
+                } catch(e) {}
+            });
+        }
+
+        function stopConnection() {
+            isLookingForPartner = false;
+            let wasConnected = false;
             if (currentCall) { currentCall.close(); currentCall = null; wasConnected = true; }
             if (currentConnection) { currentConnection.close(); currentConnection = null; wasConnected = true; }
             
             document.getElementById('strangerVideo').srcObject = null;
-            
-            // Khóa khung chat
             document.getElementById('msgInput').disabled = true;
             document.getElementById('sendBtn').disabled = true;
             document.getElementById('sendBtn').style.opacity = '0.5';
 
             document.getElementById('statusOverlay').style.display = 'flex';
-            document.querySelector('.fa-spinner').style.display = 'none';
+            document.getElementById('loadingIcon').style.display = 'none';
             document.getElementById('statusText').innerText = "Đã dừng. Nhấn Bắt đầu hoặc Next để tìm người mới.";
             
-            if (wasConnected) {
-                addSystemMsg("Bạn đã ngắt kết nối với người lạ.");
-            }
+            if (wasConnected) addSystemMsg("Đã ngắt kết nối với người lạ.");
         }
 
-        // NEXT: CHUYỂN NGƯỜI LẠ
         function nextStranger() {
-            stopConnection(); // Cắt đứt người cũ trước
-            findStranger();   // Kích hoạt tìm người mới
+            stopConnection();
+            findStranger();
         }
 
+        // Thuật toán: Hét lên MQTT "Tôi đang tìm người"
         function findStranger() {
-            if (!peer) return alert("Hệ thống chưa sẵn sàng!");
+            if (!peer || !mqttClient) return alert("Hệ thống chưa sẵn sàng!");
             
+            isLookingForPartner = true;
             document.getElementById('statusOverlay').style.display = 'flex';
-            document.querySelector('.fa-spinner').style.display = 'block';
-            document.getElementById('statusText').innerText = "Đang tìm kiếm người lạ...";
-             
-             // Giả lập đang tìm kiếm (Ở thực tế sẽ kết nối Firebase tại đây)
-             setTimeout(() => {
-                 document.getElementById('statusText').innerText = "Đang chờ Firebase Database để ghép cặp tự động. Bạn có thể tự gọi hàm connectToStranger(ID) để test.";
-                 document.querySelector('.fa-spinner').style.display = 'none';
-             }, 3000);
+            document.getElementById('loadingIcon').style.display = 'block';
+            document.getElementById('statusText').innerText = "Đang rà soát mạng lưới tìm người lạ...";
+            
+            // Hét lên loa phường mỗi 2 giây cho đến khi có người gọi
+            let searchInterval = setInterval(() => {
+                if (!isLookingForPartner) {
+                    clearInterval(searchInterval);
+                    return;
+                }
+                mqttClient.publish(LOBBY_TOPIC, JSON.stringify({
+                    action: 'LOOKING',
+                    peerId: peer.id
+                }));
+            }, 2000);
         }
 
+        // Kết nối thẳng tới người lạ
         function connectToStranger(strangerId) {
             const conn = peer.connect(strangerId);
             setupChatEvent(conn);
@@ -252,17 +289,13 @@
             call.on('stream', (remoteStream) => {
                 document.getElementById('strangerVideo').srcObject = remoteStream;
                 document.getElementById('statusOverlay').style.display = 'none';
-                addSystemMsg("Đã kết nối thành công! Mỉm cười nào 😊");
+                addSystemMsg("Đã ghép đôi thành công! Hãy chào hỏi đi nào 😊");
                 
-                // Mở khóa khung chat
                 document.getElementById('msgInput').disabled = false;
                 document.getElementById('sendBtn').disabled = false;
                 document.getElementById('sendBtn').style.opacity = '1';
             });
-            call.on('close', () => {
-                stopConnection(); // Nếu người kia tắt, mình cũng hiện trạng thái Dừng
-                addSystemMsg("Người lạ đã rời đi.");
-            });
+            call.on('close', () => stopConnection());
         }
 
         function setupChatEvent(conn) {
