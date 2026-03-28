@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Ẩn Danh - Gặp Gỡ Người Lạ</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --text-color: #1c1e21;
+            --primary-color: #0084ff;
+            --panel-bg: #ffffff;
+            --border-color: #ddd;
+            --chat-bg: #f9f9f9;
+            --msg-my-bg: #0084ff;
+            --msg-my-text: #fff;
+            --msg-other-bg: #e4e6eb;
+            --msg-other-text: #1c1e21;
+        }
+
+        .dark-mode {
+            --bg-color: #18191a;
+            --text-color: #e4e6eb;
+            --primary-color: #2d88ff;
+            --panel-bg: #242526;
+            --border-color: #3a3b3c;
+            --chat-bg: #18191a;
+            --msg-my-bg: #2d88ff;
+            --msg-other-bg: #3a3b3c;
+            --msg-other-text: #e4e6eb;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-color); transition: all 0.3s ease; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background-color: var(--panel-bg); border-bottom: 1px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.05); z-index: 10; }
+        .logo { font-size: 24px; font-weight: bold; color: var(--primary-color); display: flex; align-items: center; gap: 10px;}
+        .controls { display: flex; align-items: center; gap: 15px; }
+        .controls button { background: none; border: none; font-size: 20px; color: var(--text-color); cursor: pointer; }
+
+        main { display: flex; flex: 1; overflow: hidden; padding: 20px; gap: 20px; max-width: 1400px; margin: 0 auto; width: 100%; }
+
+        /* Video Section */
+        .video-section { flex: 2; display: flex; flex-direction: column; gap: 15px; background: var(--panel-bg); padding: 15px; border-radius: 12px; border: 1px solid var(--border-color); position: relative; }
+        .video-container { flex: 1; position: relative; background: #000; border-radius: 8px; overflow: hidden; display: flex; justify-content: center; align-items: center;}
+        #strangerVideo { width: 100%; height: 100%; object-fit: cover; }
+        #myVideo { position: absolute; bottom: 15px; right: 15px; width: 150px; height: 110px; background: #222; border-radius: 8px; object-fit: cover; border: 2px solid #fff; box-shadow: 0 4px 8px rgba(0,0,0,0.3); transform: scaleX(-1); }
+        
+        .action-buttons { display: flex; gap: 10px; }
+        .btn { flex: 1; padding: 15px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; color: #fff; transition: opacity 0.2s; }
+        .btn:hover { opacity: 0.9; }
+        .btn-start { background-color: var(--primary-color); }
+        .btn-next { background-color: #ff4757; }
+        .btn-stop { background-color: #747d8c; }
+
+        /* Chat Section */
+        .chat-section { flex: 1; display: flex; flex-direction: column; background: var(--panel-bg); border-radius: 12px; border: 1px solid var(--border-color); overflow: hidden; min-width: 300px;}
+        .chat-header { padding: 15px; border-bottom: 1px solid var(--border-color); font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Small buttons for Chat Header */
+        .btn-small { padding: 6px 12px; border: none; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; color: #fff; transition: opacity 0.2s; }
+        .btn-small:hover { opacity: 0.9; }
+        .btn-small.btn-next { background-color: #ff4757; }
+        .btn-small.btn-stop { background-color: #747d8c; }
+
+        .chat-messages { flex: 1; padding: 15px; overflow-y: auto; background-color: var(--chat-bg); display: flex; flex-direction: column; gap: 10px; }
+        .msg { max-width: 80%; padding: 10px 15px; border-radius: 18px; line-height: 1.4; word-wrap: break-word; }
+        .msg.my-msg { align-self: flex-end; background-color: var(--msg-my-bg); color: var(--msg-my-text); border-bottom-right-radius: 4px; }
+        .msg.stranger-msg { align-self: flex-start; background-color: var(--msg-other-bg); color: var(--msg-other-text); border-bottom-left-radius: 4px; }
+        .system-msg { align-self: center; font-size: 13px; color: gray; font-style: italic; margin: 5px 0; text-align: center; }
+
+        .chat-input { display: flex; padding: 15px; border-top: 1px solid var(--border-color); background: var(--panel-bg); gap: 10px; }
+        .chat-input input { flex: 1; padding: 12px 15px; border-radius: 20px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); outline: none; }
+        .chat-input button { background: var(--primary-color); color: white; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; display: flex; justify-content: center; align-items: center; }
+
+        /* Status Overlay */
+        #statusOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; color: white; font-size: 20px; z-index: 5; flex-direction: column; gap: 10px; text-align: center; padding: 20px;}
+        
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .modal { background: var(--panel-bg); padding: 30px; border-radius: 12px; text-align: center; width: 90%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .modal input { width: 100%; padding: 12px; margin: 20px 0; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-color); color: var(--text-color); font-size: 16px; outline: none; }
+
+        @media (max-width: 768px) {
+            main { flex-direction: column; overflow-y: auto; }
+            .video-section { flex: none; height: 50vh; }
+            .chat-section { flex: none; height: 50vh; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="modal-overlay" id="nicknameModal">
+        <div class="modal">
+            <h2>Chào mừng bạn!</h2>
+            <p style="margin-top: 10px; color: gray;">Vui lòng nhập biệt danh để tham gia trò chuyện</p>
+            <input type="text" id="nicknameInput" placeholder="VD: Mèo Lười...">
+            <button class="btn btn-start" style="width: 100%;" onclick="startApp()">Vào Phòng</button>
+        </div>
+    </div>
+
+    <header>
+        <div class="logo"><i class="fas fa-video"></i> RandomChat</div>
+        <div class="controls">
+            <span id="currentUserInfo" style="font-weight: 500;"></span>
+            <button onclick="toggleTheme()"><i class="fas fa-moon" id="themeIcon"></i></button>
+        </div>
+    </header>
+
+    <main>
+        <div class="video-section">
+            <div class="video-container">
+                <div id="statusOverlay">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 30px;"></i>
+                    <span id="statusText">Nhấn Bắt Đầu để tìm người lạ</span>
+                </div>
+                <video id="strangerVideo" autoplay playsinline></video>
+                <video id="myVideo" autoplay muted playsinline></video>
+            </div>
+            <div class="action-buttons">
+                <button class="btn btn-start" id="startBtn" onclick="findStranger()"><i class="fas fa-play"></i> Bắt đầu</button>
+                <button class="btn btn-stop" onclick="stopConnection()"><i class="fas fa-stop"></i> Dừng</button>
+                <button class="btn btn-next" onclick="nextStranger()"><i class="fas fa-forward"></i> Next</button>
+            </div>
+        </div>
+
+        <div class="chat-section">
+            <div class="chat-header" id="chatHeader">
+                <span><i class="fas fa-comments"></i> Trò chuyện</span>
+                <div style="display: flex; gap: 5px;">
+                    <button class="btn-small btn-stop" onclick="stopConnection()"><i class="fas fa-stop"></i></button>
+                    <button class="btn-small btn-next" onclick="nextStranger()">Next <i class="fas fa-forward"></i></button>
+                </div>
+            </div>
+            <div class="chat-messages" id="chatBox">
+                <div class="system-msg">Chào mừng bạn đến với hệ thống chat ngẫu nhiên!</div>
+            </div>
+            <div class="chat-input">
+                <input type="text" id="msgInput" placeholder="Nhập tin nhắn..." onkeypress="handleEnter(event)" disabled>
+                <button onclick="sendMessage()" id="sendBtn" style="opacity: 0.5;" disabled><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let myName = "";
+        let localStream = null;
+        let isDark = false;
+        let peer = null; 
+        let currentCall = null;
+        let currentConnection = null;
+
+        window.onload = () => {
+            const savedName = localStorage.getItem('nickname');
+            if (savedName) document.getElementById('nicknameInput').value = savedName;
+        };
+
+        function startApp() {
+            const nameInput = document.getElementById('nicknameInput').value.trim();
+            if (!nameInput) return alert("Vui lòng nhập biệt danh!");
+            myName = nameInput;
+            localStorage.setItem('nickname', myName);
+            document.getElementById('currentUserInfo').innerText = "👤 " + myName;
+            document.getElementById('nicknameModal').style.display = 'none';
+            initCamera();
+        }
+
+        function toggleTheme() {
+            isDark = !isDark;
+            document.body.classList.toggle('dark-mode');
+            document.getElementById('themeIcon').className = isDark ? "fas fa-sun" : "fas fa-moon";
+        }
+
+        async function initCamera() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById('myVideo').srcObject = localStream;
+                initPeer();
+            } catch (err) {
+                alert("Cần cho phép Camera/Mic để tiếp tục!");
+            }
+        }
+
+        function initPeer() {
+            document.getElementById('statusText').innerText = "Đang kết nối tới máy chủ...";
+            peer = new Peer(); 
+            peer.on('open', (id) => {
+                document.getElementById('statusText').innerText = "Đã sẵn sàng! Nhấn 'Bắt đầu' để tìm người";
+                document.getElementById('statusOverlay').style.display = 'flex';
+                document.querySelector('.fa-spinner').style.display = 'none';
+            });
+            peer.on('call', (call) => {
+                call.answer(localStream);
+                setupCallEvent(call);
+            });
+            peer.on('connection', (conn) => setupChatEvent(conn));
+        }
+
+        // DỪNG KẾT NỐI HIỆN TẠI (Cả Video lẫn Chat)
+        function stopConnection() {
+            let wasConnected = false;
+            
+            if (currentCall) { currentCall.close(); currentCall = null; wasConnected = true; }
+            if (currentConnection) { currentConnection.close(); currentConnection = null; wasConnected = true; }
+            
+            document.getElementById('strangerVideo').srcObject = null;
+            
+            // Khóa khung chat
+            document.getElementById('msgInput').disabled = true;
+            document.getElementById('sendBtn').disabled = true;
+            document.getElementById('sendBtn').style.opacity = '0.5';
+
+            document.getElementById('statusOverlay').style.display = 'flex';
+            document.querySelector('.fa-spinner').style.display = 'none';
+            document.getElementById('statusText').innerText = "Đã dừng. Nhấn Bắt đầu hoặc Next để tìm người mới.";
+            
+            if (wasConnected) {
+                addSystemMsg("Bạn đã ngắt kết nối với người lạ.");
+            }
+        }
+
+        // NEXT: CHUYỂN NGƯỜI LẠ
+        function nextStranger() {
+            stopConnection(); // Cắt đứt người cũ trước
+            findStranger();   // Kích hoạt tìm người mới
+        }
+
+        function findStranger() {
+            if (!peer) return alert("Hệ thống chưa sẵn sàng!");
+            
+            document.getElementById('statusOverlay').style.display = 'flex';
+            document.querySelector('.fa-spinner').style.display = 'block';
+            document.getElementById('statusText').innerText = "Đang tìm kiếm người lạ...";
+             
+             // Giả lập đang tìm kiếm (Ở thực tế sẽ kết nối Firebase tại đây)
+             setTimeout(() => {
+                 document.getElementById('statusText').innerText = "Đang chờ Firebase Database để ghép cặp tự động. Bạn có thể tự gọi hàm connectToStranger(ID) để test.";
+                 document.querySelector('.fa-spinner').style.display = 'none';
+             }, 3000);
+        }
+
+        function connectToStranger(strangerId) {
+            const conn = peer.connect(strangerId);
+            setupChatEvent(conn);
+            const call = peer.call(strangerId, localStream);
+            setupCallEvent(call);
+        }
+
+        function setupCallEvent(call) {
+            currentCall = call;
+            call.on('stream', (remoteStream) => {
+                document.getElementById('strangerVideo').srcObject = remoteStream;
+                document.getElementById('statusOverlay').style.display = 'none';
+                addSystemMsg("Đã kết nối thành công! Mỉm cười nào 😊");
+                
+                // Mở khóa khung chat
+                document.getElementById('msgInput').disabled = false;
+                document.getElementById('sendBtn').disabled = false;
+                document.getElementById('sendBtn').style.opacity = '1';
+            });
+            call.on('close', () => {
+                stopConnection(); // Nếu người kia tắt, mình cũng hiện trạng thái Dừng
+                addSystemMsg("Người lạ đã rời đi.");
+            });
+        }
+
+        function setupChatEvent(conn) {
+            currentConnection = conn;
+            conn.on('data', (data) => appendMessage(data.name, data.text, 'stranger-msg'));
+            conn.on('close', () => stopConnection());
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('msgInput');
+            const text = input.value.trim();
+            if (!text || !currentConnection) return;
+
+            appendMessage("Bạn", text, 'my-msg');
+            if (currentConnection.open) currentConnection.send({ name: myName, text: text });
+            input.value = '';
+        }
+
+        function handleEnter(e) { if (e.key === 'Enter') sendMessage(); }
+
+        function appendMessage(sender, text, className) {
+            const chatBox = document.getElementById('chatBox');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `msg ${className}`;
+            msgDiv.innerText = text;
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function addSystemMsg(text) {
+            const chatBox = document.getElementById('chatBox');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'system-msg';
+            msgDiv.innerText = text;
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
+</body>
+</html>
+
