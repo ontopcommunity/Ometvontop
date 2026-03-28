@@ -6,9 +6,9 @@
     <title>Chat Ẩn Danh - No Database</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
-    <!-- 1. Thư viện PeerJS (Kết nối P2P Video/Chat) -->
+    <!-- Thư viện PeerJS (Kết nối P2P Video/Chat) -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <!-- 2. Thư viện MQTT (Dùng làm "Loa phường" tìm người lạ thay cho Database) -->
+    <!-- Thư viện MQTT (Dùng làm "Loa phường" tìm người lạ thay cho Database) -->
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
     <style>
@@ -153,7 +153,6 @@
         let currentCall = null;
         let currentConnection = null;
         
-        // MQTT (Lobby tìm kiếm công cộng)
         let mqttClient = null;
         const LOBBY_TOPIC = "random-chat-vietnam-room-8888"; 
         let isLookingForPartner = false;
@@ -184,13 +183,12 @@
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 document.getElementById('myVideo').srcObject = localStream;
                 initPeer();
-                initMqttLobby(); // Bật loa phường
+                initMqttLobby(); 
             } catch (err) {
                 alert("Cần cho phép Camera/Mic để tiếp tục!");
             }
         }
 
-        // Khởi tạo PeerJS (Cấp ID mạng)
         function initPeer() {
             document.getElementById('statusText').innerText = "Đang kết nối vào mạng lưới...";
             peer = new Peer(); 
@@ -199,7 +197,7 @@
                 document.getElementById('loadingIcon').style.display = 'none';
             });
             peer.on('call', (call) => {
-                // Có người gọi đến, mình nghe máy
+                // Người kia gọi đến -> Mình ngừng tìm kiếm và nghe máy
                 isLookingForPartner = false; 
                 call.answer(localStream);
                 setupCallEvent(call);
@@ -207,25 +205,25 @@
             peer.on('connection', (conn) => setupChatEvent(conn));
         }
 
-        // Khởi tạo kênh tìm kiếm trung gian (MQTT Public Broker)
         function initMqttLobby() {
-            // Dùng một broker WSS miễn phí và công cộng
             mqttClient = mqtt.connect('wss://broker.hivemq.com:8443/mqtt');
             
             mqttClient.on('connect', () => {
                 mqttClient.subscribe(LOBBY_TOPIC);
-                console.log("Đã vào sảnh chờ chung!");
             });
 
             mqttClient.on('message', (topic, message) => {
-                if (!isLookingForPartner || !peer) return; // Nếu đang không tìm người thì mặc kệ
+                if (!isLookingForPartner || !peer) return; 
                 
                 try {
                     let data = JSON.parse(message.toString());
-                    // Nếu thấy có ai đó đang tìm, và ID đó không phải của mình
                     if (data.action === 'LOOKING' && data.peerId !== peer.id) {
-                        isLookingForPartner = false; // Ngừng tìm
-                        connectToStranger(data.peerId); // Chủ động gọi người đó
+                        // FIX LỖI "TÔNG XE": Chỉ người có ID chuỗi lớn hơn mới được chủ động gọi
+                        if (peer.id > data.peerId) {
+                            isLookingForPartner = false; 
+                            connectToStranger(data.peerId); 
+                        }
+                        // Nếu ID nhỏ hơn, không làm gì cả, ngồi im chờ người kia gọi tới (hàm peer.on('call') sẽ đón)
                     }
                 } catch(e) {}
             });
@@ -254,7 +252,6 @@
             findStranger();
         }
 
-        // Thuật toán: Hét lên MQTT "Tôi đang tìm người"
         function findStranger() {
             if (!peer || !mqttClient) return alert("Hệ thống chưa sẵn sàng!");
             
@@ -263,7 +260,6 @@
             document.getElementById('loadingIcon').style.display = 'block';
             document.getElementById('statusText').innerText = "Đang rà soát mạng lưới tìm người lạ...";
             
-            // Hét lên loa phường mỗi 2 giây cho đến khi có người gọi
             let searchInterval = setInterval(() => {
                 if (!isLookingForPartner) {
                     clearInterval(searchInterval);
@@ -276,7 +272,6 @@
             }, 2000);
         }
 
-        // Kết nối thẳng tới người lạ
         function connectToStranger(strangerId) {
             const conn = peer.connect(strangerId);
             setupChatEvent(conn);
